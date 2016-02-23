@@ -13,7 +13,7 @@
     https://chrome.google.com/webstore/detail/postman/fhbjgbiflinjbdggehcddcbncdddomop?hl=en
 
   .EXAMPLE
-    Execute-AWRestAPI.ps1 -userName Administrator -password password -tenantAPIKey 4+apikeyw/krandomSstuffIleq4MY6A7WPmo9K9AbM6A= -outputFile c:\Users\Administrator\Desktop\output.txt -endpointURL https://demo/awmdm.com/API/v1/mdm/devices/serialnumber  -inputFile C:\Users\Administrator\Desktop\SerialNumbers1.txt -Verbose
+    Execute-AWRestAPI.ps1 -userName Administrator -password password -tenantAPIKey 4+apikeyw/krandomSstuffIleq4MY6A7WPmo9K9AbM6A= -outputFile c:\Users\Administrator\Desktop\output.txt -endpointURL https://demo.awmdm.com/API/v1/mdm/devices/serialnumber  -inputFile C:\Users\Administrator\Desktop\SerialNumbers1.txt -Verbose
   
   .PARAMETER userName
     An AirWatch account in the tenant is being queried.  This user must have the API role at a minimum.
@@ -138,15 +138,17 @@ Function Set-DeviceListJSON {
 #>
 Function Get-StringFromArray {
 
-    Param([string[]]$deviceFields, [string]$separator = ",")
+    Param([Array]$deviceFields, [string]$separator = ",")
 
     $first = $True
+    Write-Output ("Device Fields: " + $deviceFields.Count)
     foreach ($currentField in $deviceFields) {
+        $currentField.ToString()
         If ($first -eq $True) {
             $outputString = $currentField
             $first = $false
         } Else {
-            $outputString = $separator + $currentField
+            $outputString += $separator + $currentField
         }
     }
     
@@ -155,36 +157,38 @@ Function Get-StringFromArray {
 
 Function Build-OutputHeader {
     
-    $devElements = @()
-    $devElements += "UDID" > $null
-    $devElements += "SerialNumber" > $null
-    $devElements += "MacAddress"
-    $devElements += "Imei"
-    $devElements += "AssetNumber"
-    $devElements += "DeviceFriendlyName"
-    $devElements += "LocationGroupName"
-    $devElements += "UserName"
-    $devElements += "UserEmailAddress"
-    $devElements += "Ownership"
-    $devElements += "Platform"
-    $devElements += "Model"
-    $devElements += "OperatingSystem"
-    $devElements += "PhoneNumber"
-    $devElements += "LastSeen"
-    $devElements += "EnrollmentStatus"
-    $devElements += "ComplianceStatus"
-    $devElements += "CompromisedStatus"
-    $devElements += "LastEnrolledOn"
-    $devElements += "LastComplianceCheckOn"
-    $devElements += "LastCompromisedCheckOn"
-    $devElements += "IsSupervised"
-    $devElements += "DataEncryptionYN"
-    $devElements += "AcLineStatus"
-    $devElements += "VirtualMemory"
-    $devElements += "OEMInfo"
-    $devElements += "AirWatchID"
-    Write-Output $devElements.Count
-    Return $devElements
+    Write-Output "Starting Build Headers"
+    $deviceElement = New-Object System.Collections.Generic.List[System.Object]
+    $deviceElement.Add("UDID") 
+    $deviceElement.Add("SerialNumber")
+    $deviceElement.Add("MacAddress")
+    $deviceElement.Add("IMEI")
+    $deviceElement.Add("AssetNumber")
+    $deviceElement.Add("DeviceFriendlyName")
+    $deviceElement.Add("LocationGroupName")
+    $deviceElement.Add("UserName")
+    $deviceElement.Add("UserEmailAddress")
+    $deviceElement.Add("Ownership")
+    $deviceElement.Add("Platform")
+    $deviceElement.Add("Model")
+    $deviceElement.Add("OperatingSystem")
+    $deviceElement.Add("PhoneNumber")
+    $deviceElement.Add("LastSeen")
+    $deviceElement.Add("EnrollmentStatus")
+    $deviceElement.Add("ComplianceStatus")
+    $deviceElement.Add("CompromisedStatus")
+    $deviceElement.Add("LastEnrolledOn")
+    $deviceElement.Add("LastComplianceCheckOn")
+    $deviceElement.Add("LastCompromisedCheckOn")
+    $deviceElement.Add("IsSupervised")
+    $deviceElement.Add("DataEncryptionYN")
+    $deviceElement.Add("AcLineStatus")
+    $deviceElement.Add("VirtualMemory")
+    $deviceElement.Add("OEMInfo")
+    $deviceElement.Add("AirWatchID")
+
+    $headerString = Get-StringFromArray($deviceElement.ToArray())
+    Write-Output $headerString
 }
 
 <#
