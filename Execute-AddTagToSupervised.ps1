@@ -26,8 +26,8 @@
     and you will find the key in the API Key field.  If it is not there you may need override the settings and Enable API Access
 
   .PARAMETER airwatchServer
-    This will be the https://<your_AirWatch_Server>/API/v1/mdm/devices/serialnumber.  If you want to modify this script to get other data
-    please contact the REST API help at https://<your_AirWatch_Server>/API/help.
+    This will be the https://<your_AirWatch_Server>.  All of the REST endpoints start with a forward slash (/) so do not include that with
+    the server name
 
   .PARAMETER organizationGroupName
     This will be the organization group name in the AirWatch console.
@@ -101,6 +101,9 @@ Function Get-OrganizationGroupID {
 
     Param([string]$organizationGroupName, $airwatchServer, [object]$headers)
 
+    Write-Verbose("------------------------------")
+    Write-Verbose("Getting Group ID from Group Name")
+
     $endpointURL = $airwatchServer + "/api/system/groups/search?groupID=" + $organizationGroupName
     $webReturn = Invoke-RestMethod -Method Get -Uri $endpointURL -Headers $headers
     $totalReturned = $webReturn.Total
@@ -111,13 +114,18 @@ Function Get-OrganizationGroupID {
     } else {
         Write-Output("Group Name: " + $organizationGroupName + " not found")
     }
-
+    
+    Write-Verbose("------------------------------")
+    Write-Verbose("")
     Return $groupID
 }
 
 Function Get-SupervidedTagID {
 
     Param([string]$organizationGroupID, [string]$airwatchServer, [object]$headers)
+
+    Write-Verbose("------------------------------")
+    Write-Verbose("Getting Supervised Tag")
 
     $endpointURL = $airwatchServer + "/api/mdm/tags/search?organizationgroupid=" + $organizationGroupID
     $webReturn = Invoke-RestMethod -Method Get -Uri $endpointURL -Headers $headers
@@ -126,16 +134,21 @@ Function Get-SupervidedTagID {
     Write-Verbose("Web Return: " + $webReturn.Total)
     If ([int]$webReturn.Total -gt 0) {
         foreach($currentTag in $webReturn.Tags) {
-            if ($currentTag.TagName.ToLower() = "supervised") {
+            if ($currentTag.TagName.ToLower() -eq "supervised") {
                 $supervisedTagID = $currentTag.Id.Value
                 $supervisedTagExists = $True
+                Write-Verbose("Found supervised tag: " + $supervisedTagID)
             }
         }
     }
 
     If ($supervisedTagExists -ne $True) {
-        # This REST API call is not working right now 
+        # This REST API call is not working right now
+        Write-Verbose("Supervised Tag Not Found")
     }
+
+    Write-Verbose("------------------------------")
+    Write-Verbose("")
 
     Return $supervisedTagID
 }
@@ -162,31 +175,43 @@ Function Get-SupervisedTagJSON {
 	Return $tagJSON
 }
 
-$concateUserInfo = $userName + ":" + $password
-$deviceListURI = $baseURL + $bulkDeviceEndpoint
-$restUserName = Get-BasicUserForAuth ($concateUserInfo)
-
 <#  This function builds the JSON to add the supervised tag to all of the devices that are in supervised mode. #>
 Function Build-AddSupervisedTagJSON {
 
     Param([Array]$deviceList)
+
+    Write-Verbose("------------------------------")
+    Write-Verbose("Building JSON to Post")
+
     $arrayLength = $deviceList.Count
     $counter = 0
     $quoteCharacter = [char]34
     
     $addTagJSON = "{ " + $quoteCharacter + "BulkValues" + $quoteCharacter + " : { " + $quoteCharacter + "Value" + $quoteCharacter + " : [ "
     foreach ($currentDeviceID in $deviceList) {
+        $deviceIDString = Out-String -InputObject $currentDeviceID
+        $deviceIDString = $deviceIDString.Trim()
+
         $counter = $counter + 1
         if ($counter -lt $arrayLength) {
-            $addTagJSON = $addTagJSON + $quoteCharacter + $currentDeviceID + $quoteCharacter + ", "
+            $addTagJSON = $addTagJSON + $quoteCharacter + $deviceIDString + $quoteCharacter + ", "
         } else {
-            $addTagJSON = $addTagJSON + $quoteCharacter + $currentDeviceID + $quoteCharacter
+            $addTagJSON = $addTagJSON + $quoteCharacter + $deviceIDString + $quoteCharacter
         }
     }
     $addTagJSON = $addTagJSON + " ] } }"
 
+    Write-Verbose($addTagJSON)
+    Write-Verbose("------------------------------")
+    Write-Verbose("")
+    
     Return $addTagJSON
 }
+
+<# This is the actual start of the script.  All above functions are called from this point forward. #>
+$concateUserInfo = $userName + ":" + $password
+$deviceListURI = $baseURL + $bulkDeviceEndpoint
+$restUserName = Get-BasicUserForAuth ($concateUserInfo)
 
 <#
   Build the headers and send the request to the server.  The response is returned as a PSObject $webReturn, which is a collection
@@ -197,7 +222,6 @@ $useJSON = "application/json"
 $headers = Build-Headers $restUserName $tenantAPIKey $useJSON $useJSON
 $organizationGroupID = Get-OrganizationGroupID $organizationGroupName $airwatchServer $headers
 $supervisedTagIid = Get-SupervidedTagID $organizationGroupID $airwatchServer $headers
-Write-Verbose $supervisedTagIid
 
 <# 
     Get the tags collection and make sure there is a "Supervised" tag.  This function needs to be updated because I found
@@ -209,19 +233,20 @@ $webReturn = Invoke-RestMethod -Method Get -Uri $endpointURL -Headers $headers
 #Build an array of all the devices that are supervised
 $endpointURL = $airwatchServer + "/api/mdm/devices/search?platform=Apple"
 $webReturn = Invoke-RestMethod -Method Get -Uri $endpointURL -Headers $headers
-[Array]$supervisedDeviceIDs
+$supervisedDeviceIDs = New-Object System.Collections.ArrayList
 foreach ($currentDevice in $webReturn.Devices) {
 	If ($currentDevice.IsSupervised -eq $True) {
-        $supervisedDeviceIDs = $supervisedDeviceIDs + $currentDevice.Id.Value
+        $supervisedDeviceIDs.Add($currentDevice.Id.Value)
     }
 }
 
 $addTagJSON = Build-AddSupervisedTagJSON $supervisedDeviceIDs
-Write-Verbose $addTagJSON
-
 $endpointURL = $airwatchServer + "/api/mdm/tags/" + $supervisedTagIid + "/adddevices"
-Write-Verbose $endpointURL
 $webReturn = Invoke-RestMethod -Method Post -Uri $endpointURL -Headers $headers -Body $addTagJSON
+
+Write-Verbose("------------------------------")
+Write-Verbose("Results of Add Tags Call")
 Write-Verbose("Total Items: " +$webReturn.TotalItems)
 Write-Verbose("Accepted Items: " + $webReturn.AcceptedItems)
 Write-Verbose("Failed Items: " + $webReturn.FailedItems)
+Write-Verbose("------------------------------")
