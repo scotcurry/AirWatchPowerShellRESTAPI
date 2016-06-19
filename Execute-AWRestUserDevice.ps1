@@ -28,7 +28,9 @@
     This will be the https://<your_AirWatch_Server>, ex. https://cn135.awmdm.com.
 
   .PARAMETER outputFile
-    This will be the file that contains the list of devices and users.    
+    This will be the file that contains the list of devices and users.
+    
+  .PARAMETER dayLastSeen (optional)
 #>
 
 [CmdletBinding()]
@@ -98,30 +100,6 @@ Function Build-Headers {
 }
 
 <#
-  This is a function based on https://www.uvm.edu/~gcd/2010/11/powershell-join-string-function/.  What it does is take an array of all
-  of the device fields and create a comma separated line of data for output.
-#>
-Function Get-StringFromArray {
-
-    Param([Array]$deviceFields, [string]$separator = ",")
-
-    $first = $True
-    Write-Output ("Device Fields: " + $deviceFields.Count)
-    foreach ($currentField in $deviceFields) {
-        $currentField.ToString()
-        If ($first -eq $True) {
-            $outputString = $currentField
-            $first = $false
-        } Else {
-            $outputString += $separator + $currentField
-        }
-    }
-    
-    Return $outputString
-}
-
-
-<#
   Because we are only looking for the devices that have been seen in a specific amount of time we need to build the time value to
   add it to the endpoint query.
 #>
@@ -133,6 +111,8 @@ Function Get-DateLastSeen {
     }
     $dateToFormat = (Get-Date).AddDays(-$daysToGoBack)
     $dateSeenString = $dateToFormat.ToString("yyyy-MM-ddTHH:mm:ss.fff")
+    $dateToPrint = $dateToFormat.ToString("yyyy-MM-ddTHH:mm:ss.fff")
+    #Write-Output("Getting Device Last Seen Since: " + $dateToPrint)
 
     Return $dateSeenString
 }
@@ -141,39 +121,12 @@ Function Get-DateLastSeen {
   Pretty self explanatory.  Because we are creating a CSV file we need to provide a header.
 #>
 Function Build-OutputHeader {
-    
-    Write-Output "Starting Build Headers"
-    $deviceElement = New-Object System.Collections.Generic.List[System.Object]
-    $deviceElement.Add("UDID") 
-    $deviceElement.Add("SerialNumber")
-    $deviceElement.Add("MacAddress")
-    $deviceElement.Add("IMEI")
-    $deviceElement.Add("AssetNumber")
-    $deviceElement.Add("DeviceFriendlyName")
-    $deviceElement.Add("LocationGroupName")
-    $deviceElement.Add("UserName")
-    $deviceElement.Add("UserEmailAddress")
-    $deviceElement.Add("Ownership")
-    $deviceElement.Add("Platform")
-    $deviceElement.Add("Model")
-    $deviceElement.Add("OperatingSystem")
-    $deviceElement.Add("PhoneNumber")
-    $deviceElement.Add("LastSeen")
-    $deviceElement.Add("EnrollmentStatus")
-    $deviceElement.Add("ComplianceStatus")
-    $deviceElement.Add("CompromisedStatus")
-    $deviceElement.Add("LastEnrolledOn")
-    $deviceElement.Add("LastComplianceCheckOn")
-    $deviceElement.Add("LastCompromisedCheckOn")
-    $deviceElement.Add("IsSupervised")
-    $deviceElement.Add("DataEncryptionYN")
-    $deviceElement.Add("AcLineStatus")
-    $deviceElement.Add("VirtualMemory")
-    $deviceElement.Add("OEMInfo")
-    $deviceElement.Add("AirWatchID")
+ 
+    $headerOut = "UDID,SerialNumber,MacAddress,IMEI,AssetNumber,DeviceFriendlyName,LocationGroupName,UserName,UserEmailAddress,Ownership,Platform,"
+    $headerOut = $headerOut + "Model,OperatingSystem,PhoneNumber,LastSeen,EnrollmentStatus,ComplianceStatus,CompromisedStatus,LastEnrolledOn,"
+    $headerOut = $headerOut + "LastComplianceCheckOn,LastCompromisedCheckOn,IsSupervised,AcLineStatus,VirtualMemory,AirWatchUserID,UserCountry"
 
-    $headerString = Get-StringFromArray($deviceElement.ToArray())
-    Write-Output $headerString
+    Out-File -FilePath $outputFile -InputObject $headerOut
 }
 
 <#
@@ -257,4 +210,15 @@ foreach ($currentDevice in $webReturn.Devices) {
 	$outputLine = [String]$currentDevice.Id.Value + [char]9 + $currentDevice.DeviceFriendlyName + [char]9 + $currentDevice.UserName + [char]9 + $userCountry
 	$outputLine = $outputLine + [char]9 + $currentDevice.LastSeen
 	Write-Output $outputLine
+
+    $printLine = [String]$currentDevice.Id.Value + "," + $currentDevice.SerialNumber + "," + $currentDevice.MacAddress + "," + $currentDevice.Imei + ","
+    $printLine = $printLine + $currentDevice.AssetNumber + "," + $currentDevice.DeviceFriendlyName + "," + $currentDevice.LocationGroupName + ","
+    $printLine = $printLine + $currentDevice.UserName + "," + $currentDevice.UserEmailAddress + "," + $currentDevice.Ownership + "," + $currentDevice.PlatformID.Name + ","
+    $printLine = $printLine + $currentDevice.Model + "," + $currentDevice.OperatingSystem + "," + $currentDevice.PhoneNumber + "," + $currentDevice.LastSeen + ","
+    $printLine = $printLine + $currentDevice.EnrollmentStatus + "," + $currentDevice.ComplianceStatus + "," + $currentDevice.CompromisedStatus + ","
+    $printLine = $printLine + $currentDevice.LastEnrolledOn + "," + $currentDevice.LastComplianceCheckOn + "," + $currentDevice.LastCompromisedCheckOn + ","
+    $printLine = $printLine + $currentDevice.IsSupervised + "," + $currentDevice.AcLineStatus + "," + $currentDevice.VirtualMemory + "," + [String]$currentDevice.Id.Value + ","
+    $printLine = $printLine + $userCountry
+
+    Out-File -FilePath $outputFile -Append -InputObject $printLine
 }
